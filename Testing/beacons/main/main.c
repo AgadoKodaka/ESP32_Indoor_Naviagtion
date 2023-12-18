@@ -44,6 +44,9 @@ static const char *TAG_AP = "WiFi AP";
 // TaskHandle_t wifiScanTask_handler = NULL;
 
 // static int s_retry_num = 0;
+/*Targeted SSIDs*/
+const char *target_ssids[] = {"STATION 1", "SSID2", "SSID3"};
+const size_t num_ssids = sizeof(target_ssids) / sizeof(target_ssids[0]);
 
 /* FreeRTOS event group to signal when we are connected/disconnected */
 /* Start for non - voltail storge (where ESP32 will store the data)*/
@@ -134,45 +137,55 @@ void wifi_scan_task(void)
 
         ESP_LOGI(TAG_AP, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_AP, "Free memory: %d bytes", esp_get_free_heap_size());
-        esp_wifi_scan_start(NULL, true);
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
 
-        uint16_t ap_count = 0;
-        esp_wifi_scan_get_ap_num(&ap_count);
-
-        if (ap_count == 0)
+        for (size_t i = 0; i < num_ssids; i++)
         {
-            ESP_LOGI(TAG_AP, "No WiFi networks found.");
-        }
-        else
-        {
-            ESP_LOGI(TAG_AP, "Number of WiFi networks found: %u", ap_count);
+            ESP_LOGI(TAG_AP, "Scanning for SSID: %s", target_ssids[i]);
+            wifi_scan_config_t scan_config = {
+                .ssid = (uint8_t *)target_ssids[i],
+                .bssid = 0,
+                .channel = 0,
+                .show_hidden = true};
+            esp_wifi_scan_start(&scan_config, true);
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
 
-            wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_count);
-            if (ap_list)
+            uint16_t ap_count = 0;
+            esp_wifi_scan_get_ap_num(&ap_count);
+
+            if (ap_count == 0)
             {
-                esp_wifi_scan_get_ap_records(&ap_count, ap_list);
-
-                for (int i = 0; i < ap_count; i++)
-                {
-                    ESP_LOGI(TAG_AP, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
-                }
-
-                free(ap_list);
+                ESP_LOGI(TAG_AP, "No WiFi networks found.");
             }
             else
             {
-                ESP_LOGE(TAG_AP, "Failed to allocate memory for AP list.");
+                ESP_LOGI(TAG_AP, "Number of WiFi networks found: %u", ap_count);
+
+                wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_count);
+                if (ap_list)
+                {
+                    esp_wifi_scan_get_ap_records(&ap_count, ap_list);
+
+                    for (int i = 0; i < ap_count; i++)
+                    {
+                        ESP_LOGI(TAG_AP, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
+                    }
+
+                    free(ap_list);
+                }
+                else
+                {
+                    ESP_LOGE(TAG_AP, "Failed to allocate memory for AP list.");
+                }
             }
+            // Check if disconnected before delaying for next scan
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
+            if (!(xEventGroupGetBits(wifi_event_group) & WIFI_CONNECTED_BIT))
+            {
+                ESP_LOGI(TAG_AP, "WiFi Disconnected: Scan Paused");
+                continue; // Immediately check connection status again
+            }
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait before the next scan
         }
-        // Check if disconnected before delaying for next scan
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
-        if (!(xEventGroupGetBits(wifi_event_group) & WIFI_CONNECTED_BIT))
-        {
-            ESP_LOGI(TAG_AP, "WiFi Disconnected: Scan Paused");
-            continue; // Immediately check connection status again
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait before the next scan
     }
 }
 void app_main(void)
