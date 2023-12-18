@@ -15,14 +15,15 @@
 #include "lwip/sockets.h"
 
 // Function declaration
-void wifi_scan(void);
+void wifi_scan_task(void);
 
 /* STA Configuration */
 #define SSID CONFIG_WIFI_SSID
 #define PASSWORD CONFIG_WIFI_PASSWORD
 #define WIFI_SCAN_INTERVAL CONFIG_WIFI_SCAN_INTERVAL
 // #define MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_STA_RETRY
-
+static EventGroupHandle_t wifi_event_group;
+const int WIFI_CONNECTED_BIT = BIT0;
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
@@ -33,7 +34,7 @@ static const char *TAG_STA = "WiFi STA";
 static const char *TAG_AP = "WiFi AP";
 
 // Taskhanler
-TaskHandle_t wifiScanTask_handler = NULL;
+// TaskHandle_t wifiScanTask_handler = NULL;
 
 // static int s_retry_num = 0;
 
@@ -64,12 +65,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
-        ESP_LOGI(TAG_STA, "Got AP's IP: starting MQTT Client\n");
-        wifi_scan();
+        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        ESP_LOGI(TAG_STA, "Got AP's IP: WiFi Scan can proceed");
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        ESP_LOGI(TAG_STA, "Disconnected: Retrying Wi-Fi connect to AP SSID:%s password:%s", SSID, PASSWORD);
+        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        ESP_LOGI(TAG_STA, "Disconnected: WiFi Scan paused");
         esp_wifi_connect();
     }
 }
@@ -116,12 +118,15 @@ void wifi_int_STA(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_wifi_start());
     ESP_LOGI(TAG_STA, "WIFI initialize STA finished.");
 };
-void wifi_scan(void)
+void wifi_scan_task(void)
 {
     ESP_LOGI(TAG_AP, "Starting WiFi scan...");
     while (1)
     {
+        // Wait for the connected bit to be set
+        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
+        ESP_LOGI(TAG_AP, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_AP, "Free memory: %d bytes", esp_get_free_heap_size());
         esp_wifi_scan_start(NULL, true);
         vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
@@ -154,8 +159,14 @@ void wifi_scan(void)
                 ESP_LOGE(TAG_AP, "Failed to allocate memory for AP list.");
             }
         }
-
-        // vTaskDelay((WIFI_SCAN_INTERVAL - 1000) / portTICK_PERIOD_MS); // Wait before the next scan
+        // Check if disconnected before delaying for next scan
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
+        if (!(xEventGroupGetBits(wifi_event_group) & WIFI_CONNECTED_BIT))
+        {
+            ESP_LOGI(TAG_AP, "WiFi Disconnected: Scan Paused");
+            continue; // Immediately check connection status again
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait before the next scan
     }
 }
 void app_main(void)
@@ -169,6 +180,12 @@ void app_main(void)
     // Wait a second for memory initialization
     vTaskDelay(1000 / portTICK_RATE_MS);
 
+    // Initialize event group
+    wifi_event_group = xEventGroupCreate();
+
     // Initialize Wi-Fi
     wifi_int_STA();
+
+    // Create a Wi-Fi scan task
+    xTaskCreate(&wifi_scan_task, "wifi_scan_task", 4096, NULL, 5, NULL);
 }
