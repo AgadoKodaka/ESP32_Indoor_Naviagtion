@@ -1,0 +1,31 @@
+menu "WIFI Configuration"
+
+    config SCAN_LIST_SIZE
+        int "Max size of scan list"
+        range 0 20
+        default 10
+        help
+            The size of array that will be used to retrieve the list of access points.
+
+    config WIFI_SSID
+        string "SSID"
+        default "myssid"
+        help
+            The SSID of the access point to connect to.
+    config WIFI_PASSWORD
+        string "Password"
+        default "mypassword"
+        help
+            The password of the access point to connect to.
+    config WIFI_SCAN_INTERVAL
+        int "The interval between two scans"
+        range 0 20
+        default 10
+        help
+            The interval between two scans in seconds.
+    config BROKER_URL
+        string "Broker URL"
+        default "mqtt://192.168.43.19:1883"
+        help
+            URL of the broker to connect to
+endmenu
