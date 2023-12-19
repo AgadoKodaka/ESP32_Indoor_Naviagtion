@@ -146,7 +146,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
-        // mqtt_app_start();
+        mqtt_app_start();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
