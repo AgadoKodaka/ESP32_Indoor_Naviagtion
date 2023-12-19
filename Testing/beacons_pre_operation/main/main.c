@@ -3,6 +3,7 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
+
 #include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
@@ -16,50 +17,48 @@
 
 #include "mqtt_client.h"
 
-// Function declaration
-void wifi_scan_task(void);
-
 /* STA Configuration */
 #define SSID CONFIG_WIFI_SSID
 #define PASSWORD CONFIG_WIFI_PASSWORD
 #define WIFI_SCAN_INTERVAL CONFIG_WIFI_SCAN_INTERVAL
 // #define MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_STA_RETRY
 
-
-/* The event group allows declaring status for event 
+/* The event group allows declaring status for event
 Here, we declare event connected/disconnected to AP as 1 bit:*/
 static EventGroupHandle_t wifi_event_group;
 const int WIFI_CONNECTED_BIT = BIT0;
-
 
 static const char *TAG_CONNECT = "WiFi Connect";
 static const char *TAG_SCAN = "WiFi Scan";
 // static const char *TAG_LOCALIZE = "LOCALIZATION";
 static const char *TAG_MQTT = "MQTT";
 
-
 char *RSSI_TOPIC = NULL;
 char *rssi_data_json = NULL;
 
-esp_mqtt_client_handle_t client; 
+esp_mqtt_client_handle_t client;
 
-/*  Taskhanler  => not working */
-// TaskHandle_t wifiScanTask_handler = NULL;
-
-// static int s_retry_num = 0;
 /*Targeted SSIDs*/
 const char *target_ssids[] = {"STATION 1", "SSID2", "SSID3"};
 const size_t num_ssids = sizeof(target_ssids) / sizeof(target_ssids[0]);
 
 ///////////////////////////// Function declaration
 static void initialize_nvs(void);
-static void wifi_int_STA(void);
+static void wifi_init_STA(void);
 static void mqtt_app_start(void);
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data);
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event);
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
+                               int32_t event_id, void *event_data);
+void wifi_scan_task(void);
 
-
+static void log_error_if_nonzero(const char *message, int error_code)
+{
+    if (error_code != 0)
+    {
+        ESP_LOGE(__func__, "Last error %s: 0x%x", message, error_code);
+    }
+}
 ///////////////////////////// Initialization functions
 /* Start for non - voltail storge (where ESP32 will store the data)*/
 static void initialize_nvs(void)
@@ -73,7 +72,7 @@ static void initialize_nvs(void)
     ESP_ERROR_CHECK_WITHOUT_ABORT(error);
 }
 
-static void wifi_int_STA(void)
+static void wifi_init_STA(void)
 {
     /* First, report to console, start STA mode
      * Second, initialize Wi-Fi network interface
@@ -118,13 +117,14 @@ static void wifi_int_STA(void)
 };
 
 static void mqtt_app_start(void)
-{   
+{
     esp_mqtt_client_config_t mqtt_cfg = {
         .uri = CONFIG_BROKER_URL,
-        .event_handle = mqtt_event_handler,
+        // .event_handle = mqtt_event_handler,
     };
 
     client = esp_mqtt_client_init(&mqtt_cfg);
+    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
 }
 
@@ -146,7 +146,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     {
         xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
         ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
-        mqtt_app_start();
+        // mqtt_app_start();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
@@ -157,66 +157,51 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
 }
 
 //////////////////////////////////////////////////
-//!TODO: Fix MQTT event handler function
+//! TODO: Fix MQTT event handler function
 //////////////////////////////////////////////////
 static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    esp_mqtt_event_handle_t event = event_data;
+    // esp_mqtt_client_handle_t client = event->client;
+    // int msg_id;
+    switch ((esp_mqtt_event_id_t)event_id)
     {
-        esp_wifi_connect();
-        ESP_LOGI(TAG_CONNECT, "Trying to connect with Wi-Fi\n");
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED)
-    {
-        ESP_LOGI(TAG_CONNECT, "Wi-Fi connected AP SSID:%s password:%s\n", SSID, PASSWORD);
-    }
-    else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
-    {
-        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
-        mqtt_app_start();
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
-    {
-        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG_CONNECT, "Disconnected: WiFi Scan paused");
-        esp_wifi_connect();
-    }
-}
+    case MQTT_EVENT_CONNECTED:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_CONNECTED");
+        break;
+    case MQTT_EVENT_DISCONNECTED:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_DISCONNECTED");
+        break;
 
-static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
-{
-    switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_CONNECTED");
-            // sniffer_and_csi_init();
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_DISCONNECTED");
-            break;
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_DATA");
-            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("DATA=%.*s\r\n", event->data_len, event->data);
-            break;
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(TAG_MQTT, "MQTT_EVENT_ERROR");
-            break;
-        default:
-            ESP_LOGI(TAG_MQTT, "Other event id:%d", event->event_id);
-            break;
+    case MQTT_EVENT_SUBSCRIBED:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_UNSUBSCRIBED:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_PUBLISHED:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        break;
+    case MQTT_EVENT_DATA:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_DATA");
+        printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+        printf("DATA=%.*s\r\n", event->data_len, event->data);
+        break;
+    case MQTT_EVENT_ERROR:
+        ESP_LOGI(TAG_MQTT, "MQTT_EVENT_ERROR");
+        if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT)
+        {
+            log_error_if_nonzero("reported from esp-tls", event->error_handle->esp_tls_last_esp_err);
+            log_error_if_nonzero("reported from tls stack", event->error_handle->esp_tls_stack_err);
+            log_error_if_nonzero("captured as transport's socket errno", event->error_handle->esp_transport_sock_errno);
+            ESP_LOGI(TAG_MQTT, "Last errno string (%s)", strerror(event->error_handle->esp_transport_sock_errno));
+        }
+        break;
+    default:
+        ESP_LOGI(TAG_MQTT, "Other event id:%d", event->event_id);
+        break;
     }
-    return ESP_OK;
 }
 
 ///////////////////////////// Task functions
@@ -263,8 +248,8 @@ void wifi_scan_task(void)
                         ESP_LOGI(TAG_SCAN, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
 
                         /* Create Json string for publishing*/
-                        sprintf(RSSI_TOPIC,"/rssi/%s",(char *)ap_list[i].ssid);
-                        sprintf(rssi_data_json, "{'SSID':'%s','RSSI': %d,'Channel': %d}\n", 
+                        sprintf(RSSI_TOPIC, "/rssi/%s", (char *)ap_list[i].ssid);
+                        sprintf(rssi_data_json, "{'SSID':'%s','RSSI': %d,'Channel': %d}\n",
                                 (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
                         ESP_LOGI(TAG_MQTT, "RSSI_TOPIC:[%s]", RSSI_TOPIC);
                         printf(rssi_data_json);
@@ -291,24 +276,23 @@ void wifi_scan_task(void)
     }
 }
 
-
 void app_main(void)
 {
     ESP_LOGI(TAG_MQTT, "[APP] Startup..");
     ESP_LOGI(TAG_MQTT, "[APP] Free memory: %d bytes", esp_get_free_heap_size());
     ESP_LOGI(TAG_MQTT, "[APP] IDF version: %s", esp_get_idf_version());
-    
+
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT_TCP", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT_SSL", ESP_LOG_VERBOSE);
-    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
-    esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
+    // esp_log_level_set("TRANSPORT_TCP", ESP_LOG_VERBOSE);
+    // esp_log_level_set("TRANSPORT_SSL", ESP_LOG_VERBOSE);
+    // esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    // esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
     // Initialize dynamic variables
-    RSSI_TOPIC = (char*)malloc(50 * sizeof(char));
-    rssi_data_json = (char*)malloc(200 * sizeof(char));
-    
+    RSSI_TOPIC = (char *)malloc(50 * sizeof(char));
+    rssi_data_json = (char *)malloc(200 * sizeof(char));
+
     // Allow other core to finish initialization
     vTaskDelay(pdMS_TO_TICKS(200));
 
@@ -323,10 +307,12 @@ void app_main(void)
 
     // Initialize Wi-Fi
     ESP_LOGI(__func__, "Initialize Wifi STA mode");
-    wifi_int_STA();
+    wifi_init_STA();
+    // Wait a second for Wi-Fi initialization
+    vTaskDelay(1000 / portTICK_RATE_MS);
 
-    //Initialize MQTT
-    ESP_LOGI(__func__, "Initialize MQTT client");
+    // Initialize MQTT
+    // ESP_LOGI(__func__, "Initialize MQTT client");
     // mqtt_app_start();
 
     // Create a Wi-Fi scan task
