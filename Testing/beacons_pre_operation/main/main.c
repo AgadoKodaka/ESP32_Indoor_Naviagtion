@@ -25,8 +25,9 @@
 
 /* The event group allows declaring status for event
 Here, we declare event connected/disconnected to AP as 1 bit:*/
-static EventGroupHandle_t wifi_event_group;
+static EventGroupHandle_t event_group;
 const int WIFI_CONNECTED_BIT = BIT0;
+const int MQTT_CONNECTED_BIT = BIT1;
 
 static const char *TAG_CONNECT = "WiFi Connect";
 static const char *TAG_SCAN = "WiFi Scan";
@@ -39,7 +40,7 @@ char *rssi_data_json = NULL;
 esp_mqtt_client_handle_t client;
 
 /*Targeted SSIDs*/
-const char *target_ssids[] = {"STATION 1", "SSID2", "SSID3"};
+const char *target_ssids[] = {"STATION 1", "STATION 2", "STATION 3"};
 const size_t num_ssids = sizeof(target_ssids) / sizeof(target_ssids[0]);
 
 ///////////////////////////// Function declaration
@@ -144,13 +145,13 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
-        xEventGroupSetBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
         ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
         mqtt_app_start();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        xEventGroupClearBits(wifi_event_group, WIFI_CONNECTED_BIT);
+        xEventGroupClearBits(event_group, WIFI_CONNECTED_BIT);
         ESP_LOGI(TAG_CONNECT, "Disconnected: WiFi Scan paused");
         esp_wifi_connect();
     }
@@ -169,9 +170,11 @@ static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
     {
     case MQTT_EVENT_CONNECTED:
         ESP_LOGI(TAG_MQTT, "MQTT_EVENT_CONNECTED");
+        xEventGroupSetBits(event_group, MQTT_CONNECTED_BIT);
         break;
     case MQTT_EVENT_DISCONNECTED:
         ESP_LOGI(TAG_MQTT, "MQTT_EVENT_DISCONNECTED");
+        xEventGroupClearBits(event_group, MQTT_CONNECTED_BIT);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
@@ -211,8 +214,10 @@ void wifi_scan_task(void)
     while (1)
     {
         // Wait for the connected bit to be set
-        xEventGroupWaitBits(wifi_event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+        xEventGroupWaitBits(event_group, WIFI_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+        xEventGroupWaitBits(event_group, MQTT_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
 
+        ESP_LOGI(TAG_SCAN, "Both WiFi and MQTT are connected. Proceeding to scan for Wifi");
         ESP_LOGI(TAG_SCAN, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_SCAN, "Free memory: %d bytes", esp_get_free_heap_size());
 
@@ -222,7 +227,7 @@ void wifi_scan_task(void)
             wifi_scan_config_t scan_config = {
                 .ssid = (uint8_t *)target_ssids[i],
                 .bssid = 0,
-                .channel = 1,
+                .channel = 12,
                 .show_hidden = true};
             esp_wifi_scan_start(&scan_config, true);
             // vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
@@ -266,7 +271,7 @@ void wifi_scan_task(void)
             }
             // Check if disconnected before delaying for next scan
             vTaskDelay(200 / portTICK_PERIOD_MS); // Wait for the scan to complete
-            if (!(xEventGroupGetBits(wifi_event_group) & WIFI_CONNECTED_BIT))
+            if (!(xEventGroupGetBits(event_group) & WIFI_CONNECTED_BIT))
             {
                 ESP_LOGI(TAG_SCAN, "WiFi Disconnected: Scan Paused");
                 continue; // Immediately check connection status again
@@ -284,9 +289,9 @@ void app_main(void)
 
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("MQTT_CLIENT", ESP_LOG_VERBOSE);
-    // esp_log_level_set("TRANSPORT_TCP", ESP_LOG_VERBOSE);
-    // esp_log_level_set("TRANSPORT_SSL", ESP_LOG_VERBOSE);
-    // esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_TCP", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_SSL", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
     // esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
     // Initialize dynamic variables
@@ -303,7 +308,7 @@ void app_main(void)
     vTaskDelay(1000 / portTICK_RATE_MS);
 
     // Initialize event group
-    wifi_event_group = xEventGroupCreate();
+    event_group = xEventGroupCreate();
 
     // Initialize Wi-Fi
     ESP_LOGI(__func__, "Initialize Wifi STA mode");
