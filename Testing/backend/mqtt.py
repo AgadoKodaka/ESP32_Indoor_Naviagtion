@@ -11,26 +11,26 @@ def rssi_callback(client, userdata, message):
 	m = str(message.payload.decode("utf-8")).rstrip('\n').replace('\'','\"')
 	data = json.loads(m)
 
-	anchor_mac = message.topic.split('/')[2]
-	device_mac, rssi = data['MAC'], data['RSSI']
+	# Extract SSID of Beacon sent to MQTT Broker
+	Beacon_SSID = message.topic.split('/')[2] 
+	# Extract SSID and RSSI of Station scanned by Beacon
+	Station_SSID, rssi = data['SSID'], data['RSSI'] # We use IPv4, so we use SSID instead of MAC
 
-	## Filtering out Target nodes
-	if device_mac == "4C:ED:FB:50:16:ED" or device_mac == "B8:63:4D:A2:0E:13":
-		print("Data: ",anchor_mac, *data.items())
-	const.data_queue.put((anchor_mac, device_mac, rssi))
+	const.data_queue.put((Beacon_SSID, Station_SSID, rssi))
 
-def csi_callback(client, userdata, message):
-	m = str(message.payload.decode("utf-8")).rstrip('\n').replace('\'','\"')
-	data = json.loads(m)
-	print(*data.items())
+# def csi_callback(client, userdata, message):
+# 	m = str(message.payload.decode("utf-8")).rstrip('\n').replace('\'','\"')
+# 	data = json.loads(m)
+# 	print(*data.items())
 
 def on_connect(client, userdata, flags, rc):	
-	rssi_topic, csi_topic = "/rssi/#", "/csi/#"
+	rssi_topic = "/rssi/#"
+	# rssi_topic, csi_topic = "/rssi/#", "/csi/#"
 	client.subscribe(rssi_topic)
-	client.subscribe(csi_topic)
+	# client.subscribe(csi_topic)
 
 	client.message_callback_add(rssi_topic, rssi_callback)
-	client.message_callback_add(csi_topic, csi_callback)
+	# client.message_callback_add(csi_topic, csi_callback)
 
 def connect(broker_ip, broker_port):
 	client= paho.Client("Localization listener") 

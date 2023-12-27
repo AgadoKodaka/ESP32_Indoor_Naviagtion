@@ -12,14 +12,20 @@
 mosquitto -v -c <path to mosquitto.conf>
 ```
 
-### Setup Backend Server for Preprocessing RSSI values:
+### Setup Backend Server for Preprocessing RSSI values (Windows):
 1. `cd` into `Testing/backend`
-2. activate virtual environment:
+2. setup virtual env for python code
+```bash
+pip install virtualenv
+virtualenv .env
+```
+3. activate virtual environment and install dependencies:
 
 ```bash
 source .env/Scripts/activate
+pip install paho-mqtt plotly scipy
 ```
-3. run backend server paho-mqtt
+4. run backend server paho-mqtt
 - parameters:
     + `-i`: Host IP of broker (required) 
         Suggested: 127.0.0.1 (localhost)

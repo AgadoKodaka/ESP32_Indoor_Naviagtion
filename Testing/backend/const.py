@@ -9,9 +9,9 @@ positions = OrderedDict()
 
 ## Coordinates of the anchor nodes
 ANCHORS = {
-	'3C:71:BF:99:F9:E0' : [0,0],
-	'24:0A:C4:23:D9:B0' : [560,580],
-	'24:0A:C4:23:C1:EC'	: [980,0]
+	'AP1' : [0,0],
+	'AP2' : [560,580],
+	'AP3'	: [980,0]
 }
 
 ## RSSI Model

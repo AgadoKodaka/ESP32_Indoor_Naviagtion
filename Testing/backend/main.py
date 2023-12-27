@@ -42,22 +42,20 @@ def data_listener(x,y):
 		base_time = time.time()
 
 		while time.time() - base_time < const.TIME_WINDOW:
-			anchor_mac, device_mac, rssi = const.data_queue.get()
+			Beacon_SSID, Station_SSID, rssi = const.data_queue.get()
 			
-			if device_mac in rssi_data[anchor_mac]:
-				rssi_data[anchor_mac][device_mac].append(rssi) 
+			if Station_SSID in rssi_data[Beacon_SSID]:
+				rssi_data[Beacon_SSID][Station_SSID].append(rssi) 
 			else:
-				## Filtering out target nodes
-				if device_mac == "4C:ED:FB:50:16:ED" or device_mac == "B8:63:4D:A2:0E:13":
-					rssi_data[anchor_mac][device_mac] = [rssi]
+				rssi_data[Beacon_SSID][Station_SSID] = [rssi]
 
 		for a in rssi_data:
 			for d in rssi_data[a]:
 				rssi_data[a][d] = round((1. * sum(rssi_data[a][d])) / len(rssi_data[a][d]),1)
 
 		## Printing Summary of the RSSI values received
-		for anchor_mac in rssi_data:
-			print("Summary: ", anchor_mac,int(dist(const.ANCHORS[anchor_mac], [x,y])), rssi_data[anchor_mac])
+		for Beacon_SSID in rssi_data:
+			print("Summary: ", Beacon_SSID,int(dist(const.ANCHORS[Beacon_SSID], [x,y])), rssi_data[Beacon_SSID])
 		
 		localize(rssi_data)
 		rssi_data = {a: {} for a in const.ANCHORS}
