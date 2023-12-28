@@ -1,4 +1,4 @@
-menu "WIFI Configuration"
+menu "Beacon Custom Config"
 
     config SCAN_LIST_SIZE
         int "Max size of scan list"
@@ -28,4 +28,9 @@ menu "WIFI Configuration"
         default "mqtt://192.168.43.19:1883"
         help
             URL of the broker to connect to
+    config BEACON_NAME
+        string "Beacon name"
+        default "mybeacon"
+        help
+            Name of the beacon
 endmenu

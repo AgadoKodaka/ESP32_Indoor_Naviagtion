@@ -133,14 +133,15 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# WIFI Configuration
+# Beacon Custom Config
 #
 CONFIG_SCAN_LIST_SIZE=10
-CONFIG_WIFI_SSID="Kaka"
-CONFIG_WIFI_PASSWORD="procrastination"
+CONFIG_WIFI_SSID="P308"
+CONFIG_WIFI_PASSWORD="83131028"
 CONFIG_WIFI_SCAN_INTERVAL=10
-CONFIG_BROKER_URL="mqtt://192.168.161.30:1883"
-# end of WIFI Configuration
+CONFIG_BROKER_URL="mqtt://192.168.1.90:1883"
+CONFIG_BEACON_NAME="beacon1"
+# end of Beacon Custom Config
 
 #
 # Compiler options

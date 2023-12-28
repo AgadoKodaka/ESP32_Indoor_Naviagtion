@@ -7,8 +7,8 @@ data_queue = Queue()
 ## Stores positions of devices encountered so far
 positions = OrderedDict()
 
-## Coordinates of the anchor nodes
-ANCHORS = {
+## Coordinates of the Stations (APs)
+STATIONS = {
 	'Station1' : [0,0],
 	'Station2' : [560,580],
 	'Station3' : [980,0]

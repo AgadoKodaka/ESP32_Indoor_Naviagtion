@@ -8,7 +8,7 @@ import numpy as np
 
 import const
 
-xypairs = list(const.ANCHORS.values())
+xypairs = list(const.STATIONS.values())
 x_detectors = [xy[0] for xy in xypairs]
 y_detectors = [xy[1] for xy in xypairs]
 sz = [20,20,20]
@@ -36,8 +36,8 @@ def plot_heatmap(pos=[[5,5,5]]):
     for point_distances in points_distances:
     	for i,radii in enumerate(point_distances):
     		x_i = x_detectors[i]
-    		y_i = y_detectors[i]
-    		shapes.append({
+            y_i = y_detectors[i]
+            shapes.append({
     			'type': 'circle',
     			'xref': 'x',
     			'yref': 'y',

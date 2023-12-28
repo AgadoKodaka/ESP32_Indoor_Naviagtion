@@ -17,10 +17,11 @@
 
 #include "mqtt_client.h"
 
-/* STA Configuration */
+/* SDK CONFIG VARIABLES */
 #define SSID CONFIG_WIFI_SSID
 #define PASSWORD CONFIG_WIFI_PASSWORD
 #define WIFI_SCAN_INTERVAL CONFIG_WIFI_SCAN_INTERVAL
+#define BEACON_NAME CONFIG_BEACON_NAME
 // #define MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_STA_RETRY
 
 /* The event group allows declaring status for event
@@ -140,7 +141,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
     {
         esp_wifi_connect();
-        ESP_LOGI(TAG_CONNECT, "Trying to connect with Wi-Fi\n");
+        ESP_LOGI(TAG_CONNECT, "Trying to connect with Wi-Fi AP SSID:%s password:%s\n", SSID, PASSWORD);
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED)
     {
@@ -155,7 +156,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         xEventGroupClearBits(event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG_CONNECT, "Disconnected: WiFi Scan paused");
+        ESP_LOGI(TAG_CONNECT, "Disconnected: Trying to connect with WiFi again\n");
         esp_wifi_connect();
     }
 }
@@ -256,7 +257,7 @@ void wifi_scan_task(void)
                         ESP_LOGI(TAG_SCAN, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
 
                         /* Create Json string for publishing*/
-                        sprintf(RSSI_TOPIC, "/rssi/%s", (char *)ap_list[i].ssid);
+                        sprintf(RSSI_TOPIC, "/rssi/%s", BEACON_NAME);
                         sprintf(rssi_data_json, "{'SSID':'%s','RSSI': %d,'Channel': %d}\n",
                                 (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
                         ESP_LOGI(TAG_MQTT, "RSSI_TOPIC:[%s]", RSSI_TOPIC);
@@ -273,6 +274,7 @@ void wifi_scan_task(void)
                 }
             }
             // Check if disconnected before delaying for next scan
+            ESP_LOGI(TAG_SCAN, "Check if disconnected before delaying for next scan");
             vTaskDelay(200 / portTICK_PERIOD_MS); // Wait for the scan to complete
             if (!(xEventGroupGetBits(event_group) & WIFI_CONNECTED_BIT))
             {
