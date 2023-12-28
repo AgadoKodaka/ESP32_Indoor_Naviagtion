@@ -10,26 +10,6 @@ from util import *
 from scipy.optimize import minimize
 from plot import plot_heatmap
 
-def localize(rssi_data):
-	"""
-	Localizes devices based on the rssi data passed
-	"""
-	def loss(e, device_mac):
-		return sum([ ( dist(e, const.ANCHORS[a]) - rssi_model(rssi_data[a][device_mac]) )**2 for a in const.ANCHORS])
-
-	anchor_check = {}
-	for a in rssi_data:
-		for d in rssi_data[a]:
-
-			if d in anchor_check:
-				anchor_check[d].append(a)
-			else:
-				anchor_check[d] = [a]
-
-			if len(anchor_check[d]) == len(const.ANCHORS):
-				res = minimize(loss, get_position(d), args=(d))
-				const.positions[d] = (res.x, res.success)
-
 	
 def data_listener(x,y):
 	"""
@@ -57,9 +37,9 @@ def data_listener(x,y):
 		for Beacon_SSID in rssi_data:
 			print("Summary: ", Beacon_SSID,int(dist(const.ANCHORS[Beacon_SSID], [x,y])), rssi_data[Beacon_SSID])
 		
-		localize(rssi_data)
+		# localize(rssi_data)
 		rssi_data = {a: {} for a in const.ANCHORS}
-		print_positions()
+		# print_positions()
 
 def print_positions():
 	"""
@@ -81,7 +61,11 @@ if __name__ == '__main__':
 	parser.add_argument("-x", "--x", type=int, default=560)
 	parser.add_argument("-y", "--y", type=int, default=300)
 
+	print("Starting paho-mqtt client to subscribe to RSSI data")
+
 	args = parser.parse_args()
+
+	print(args)
 
 	mqtt_thread = threading.Thread(target=connect, args=(args.host, args.port))
 	mqtt_thread.start()

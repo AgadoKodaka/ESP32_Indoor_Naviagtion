@@ -9,8 +9,8 @@ def dist(a,b):
 def rssi_model(rssi):
 	return exp((rssi-const.A)/const.B)
 
-def get_position(device_mac):
-	if device_mac in const.positions:
-		return const.positions[device_mac][0]
+def get_position(Beacon_SSID):
+	if Beacon_SSID in const.positions:
+		return const.positions[Beacon_SSID][0]
 	else:
-		return const.ANCHORS['3C:71:BF:99:F9:E0']
+		raise Exception("Beacon not found in positions")
