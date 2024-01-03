@@ -17,6 +17,40 @@
 
 #include "mqtt_client.h"
 
+#include "math.h"
+
+/*
+ * Path Loss Algorithm Summary
+ * ---------------------------
+ *
+ * Original Model:
+ * Pr(dB) = P0(dB) - 10 * n * log10(d)
+ * 'Pr': received power, 'P0': power at 1 meter, 'n': path loss exponent, 'd': distance.
+ *
+ * Adjusted for RSSI:
+ * RSSI = A + B * log10(d)
+ * RSSI: received signal strength, 'A' and 'B': constants, 'd': distance.
+ *
+ * Transformed for Linear Regression:
+ * log10(d) = (RSSI - A) / B
+ * Equivalent to: log10(d) = intercept + slope * RSSI
+ * 'intercept', 'slope': regression parameters.
+ *
+ * Final Model for Distance Prediction:
+ * d = 10^(intercept + slope * RSSI)
+ * Used for estimating 'd' from RSSI.
+ */
+const float INTERCEPT = -2.99;
+const float SLOPE = 3.08;
+
+// Station' positions (to be replaced with actual coordinates)
+const int station1_x = CONFIG_STATION1_X;
+const int station1_y = CONFIG_STATION1_Y;
+const int station2_x = CONFIG_STATION2_X;
+const int station2_y = CONFIG_STATION2_Y;
+const int station3_x = CONFIG_STATION3_X;
+const int station3_y = CONFIG_STATION3_Y;
+
 /* SDK CONFIG VARIABLES */
 #define SSID CONFIG_WIFI_SSID
 #define PASSWORD CONFIG_WIFI_PASSWORD
@@ -35,8 +69,8 @@ static const char *TAG_SCAN = "WiFi Scan";
 // static const char *TAG_LOCALIZE = "LOCALIZATION";
 static const char *TAG_MQTT = "MQTT";
 
-char *RSSI_TOPIC = NULL;
-char *rssi_data_json = NULL;
+char *MQTT_TOPIC = NULL;
+char *mqtt_data_json = NULL;
 
 esp_mqtt_client_handle_t client;
 
@@ -54,6 +88,10 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
                                int32_t event_id, void *event_data);
 void wifi_scan_task(void);
 
+// Algorithm functions
+static float pathloss_calculate_dist(float rssi);
+static void trilateration_calculate_pos(float rssi[], float *posX, float *posY);
+
 ///////////////////////////// Helper functions
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -62,6 +100,37 @@ static void log_error_if_nonzero(const char *message, int error_code)
     {
         ESP_LOGE(__func__, "Last error %s: 0x%x", message, error_code);
     }
+}
+
+///////////////////////////// Algorithm functions
+static float pathloss_calculate_dist(float rssi) {
+    float log_distance = INTERCEPT + SLOPE * rssi;
+    printf("Calculated Distance: %f meters\n", log_distance);
+    return pow(10, log_distance); // 10 raised to the power of log_distance
+}
+
+// Function to calculate the position of the target node using trilateration
+// rssi: an array of RSSI values from the three station nodes
+// posX: pointer to a float where the X-coordinate will be stored
+// posY: pointer to a float where the Y-coordinate will be stored
+static void trilateration_calculate_pos(float rssi[], float *posX, float *posY) {
+    // Convert RSSI to distances using the path loss model
+    float d1 = pathloss_calculate_dist(rssi[0]);
+    float d2 = pathloss_calculate_dist(rssi[1]);
+    float d3 = pathloss_calculate_dist(rssi[2]);
+
+    // Apply trilateration formulas here to compute *posX and *posY based on d1, d2, and d3
+    // This is a simplification; real implementation may require iterative methods
+    float A = 2 * station2_x - 2 * station1_x;
+    float B = 2 * station2_y - 2 * station1_y;
+    float C = pow(d1, 2) - pow(d2, 2) - pow(station1_x, 2) + pow(station2_x, 2) - pow(station1_y, 2) + pow(station2_y, 2);
+    float D = 2 * station3_x - 2 * station2_x;
+    float E = 2 * station3_y - 2 * station2_y;
+    float F = pow(d2, 2) - pow(d3, 2) - pow(station2_x, 2) + pow(station3_x, 2) - pow(station2_y, 2) + pow(station3_y, 2);
+
+    // Calculate the position of the target node (x, y)
+    *posX = (C * E - F * B) / (E * A - B * D);
+    *posY = (C * D - A * F) / (B * D - A * E);
 }
 ///////////////////////////// Initialization functions
 /* Start for non - voltail storge (where ESP32 will store the data)*/
@@ -149,7 +218,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
+        ESP_LOGI(TAG_CONNECT, "Got AP's IP: MQTT can be connected");
         mqtt_app_start();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
@@ -160,9 +229,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-//////////////////////////////////////////////////
-//! TODO: Fix MQTT event handler function
-//////////////////////////////////////////////////
 static void mqtt_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
@@ -223,6 +289,9 @@ void wifi_scan_task(void)
         ESP_LOGI(TAG_SCAN, "Both WiFi and MQTT are connected. Proceeding to scan for Wifi");
         ESP_LOGI(TAG_SCAN, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_SCAN, "Free memory: %d bytes", esp_get_free_heap_size());
+        
+        float *rssi = (float *)malloc(sizeof(float) * num_ssids);
+        int num_stations_found = 0;
 
         for (size_t i = 0; i < num_ssids; i++)
         {
@@ -230,7 +299,7 @@ void wifi_scan_task(void)
             wifi_scan_config_t scan_config = {
                 .ssid = (uint8_t *)target_ssids[i],
                 .bssid = 0,
-                .channel = 12,
+                .channel = 1,
                 .show_hidden = true};
             esp_wifi_scan_start(&scan_config, true);
             // vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
@@ -244,6 +313,7 @@ void wifi_scan_task(void)
             }
             else
             {
+                num_stations_found++;
                 ESP_LOGI(TAG_SCAN, "Number of WiFi networks found: %u", ap_count);
 
                 wifi_ap_record_t *ap_list = (wifi_ap_record_t *)malloc(sizeof(wifi_ap_record_t) * ap_count);
@@ -251,18 +321,12 @@ void wifi_scan_task(void)
                 {
                     esp_wifi_scan_get_ap_records(&ap_count, ap_list);
 
-                    for (int i = 0; i < ap_count; i++)
+                    for (int j = 0; j < ap_count; i++)
                     {
-                        ESP_LOGI(TAG_SCAN, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
+                        ESP_LOGI(TAG_SCAN, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[j].ssid, ap_list[j].rssi, ap_list[j].primary);
 
-                        /* Create Json string for publishing*/
-                        sprintf(RSSI_TOPIC, "/rssi/%s", BEACON_NAME);
-                        sprintf(rssi_data_json, "{'SSID':'%s','RSSI': %d,'Channel': %d}\n",
-                                (char *)ap_list[i].ssid, ap_list[i].rssi, ap_list[i].primary);
-                        ESP_LOGI(TAG_MQTT, "RSSI_TOPIC:[%s]", RSSI_TOPIC);
-                        printf(rssi_data_json);
-
-                        esp_mqtt_client_publish(client, RSSI_TOPIC, rssi_data_json, 0, 1, 0);
+                        rssi[i] = ap_list[j].rssi; // Store RSSI received to calculate distance later                        
+                        
                     }
 
                     free(ap_list);
@@ -271,6 +335,8 @@ void wifi_scan_task(void)
                 {
                     ESP_LOGE(TAG_SCAN, "Failed to allocate memory for AP list.");
                 }
+
+                
             }
             // Check if disconnected before delaying for next scan
             ESP_LOGI(TAG_SCAN, "Check if disconnected before delaying for next scan");
@@ -282,7 +348,26 @@ void wifi_scan_task(void)
             }
             vTaskDelay(500 / portTICK_PERIOD_MS); // Wait before the next scan
         }
+
+        // Calculate the position of beacon if 3 stations are found
+        if (num_stations_found >= 3) {
+            float posX, posY;
+            trilateration_calculate_pos(rssi, &posX, &posY);
+
+            /* Create Json string for publishing*/
+            sprintf(MQTT_TOPIC, "/pos/%s", BEACON_NAME);
+            sprintf(mqtt_data_json, "{'posX': %f,'posY': %f}\n",
+                    posX, posY);
+            ESP_LOGI(TAG_MQTT, "MQTT_TOPIC:[%s]", MQTT_TOPIC);
+            printf(mqtt_data_json);
+
+            esp_mqtt_client_publish(client, MQTT_TOPIC, mqtt_data_json, 0, 1, 0);
+
+            free(rssi);
+        }
+    
     }
+
 }
 
 void app_main(void)
@@ -299,8 +384,8 @@ void app_main(void)
     // esp_log_level_set("OUTBOX", ESP_LOG_VERBOSE);
 
     // Initialize dynamic variables
-    RSSI_TOPIC = (char *)malloc(50 * sizeof(char));
-    rssi_data_json = (char *)malloc(200 * sizeof(char));
+    MQTT_TOPIC = (char *)malloc(50 * sizeof(char));
+    mqtt_data_json = (char *)malloc(200 * sizeof(char));
 
     // Allow other core to finish initialization
     vTaskDelay(pdMS_TO_TICKS(200));

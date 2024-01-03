@@ -1,6 +1,6 @@
 build/
 .vscode/
 .devcontainer/
-Testing/backend/.env/
-Testing/backend/__pycache__/
+.env/
+__pycache__/
 

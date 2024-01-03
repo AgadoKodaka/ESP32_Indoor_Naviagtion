@@ -133,15 +133,26 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Beacon Custom Config
+# Beacon Config
 #
 CONFIG_SCAN_LIST_SIZE=10
 CONFIG_WIFI_SSID="P308"
 CONFIG_WIFI_PASSWORD="83131028"
 CONFIG_WIFI_SCAN_INTERVAL=10
 CONFIG_BROKER_URL="mqtt://192.168.1.90:1883"
-CONFIG_BEACON_NAME="mybeacon"
-# end of Beacon Custom Config
+CONFIG_BEACON_NAME="beacon1"
+# end of Beacon Config
+
+#
+# Station Config
+#
+CONFIG_STATION1_X=0
+CONFIG_STATION1_Y=0
+CONFIG_STATION2_X=560
+CONFIG_STATION2_Y=580
+CONFIG_STATION3_X=980
+CONFIG_STATION3_Y=0
+# end of Station Config
 
 #
 # Compiler options
