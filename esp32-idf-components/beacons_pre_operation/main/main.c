@@ -231,7 +231,7 @@ void wifi_scan_task(void)
             wifi_scan_config_t scan_config = {
                 .ssid = (uint8_t *)target_ssids[i],
                 .bssid = 0,
-                .channel = 1,
+                .channel = 12,
                 .show_hidden = true};
             esp_wifi_scan_start(&scan_config, true);
             // vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
@@ -281,7 +281,7 @@ void wifi_scan_task(void)
                 ESP_LOGI(TAG_SCAN, "WiFi Disconnected: Scan Paused");
                 continue; // Immediately check connection status again
             }
-            vTaskDelay(500 / portTICK_PERIOD_MS); // Wait before the next scan
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait before the next scan
         }
     }
 }
