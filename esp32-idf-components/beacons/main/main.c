@@ -17,6 +17,8 @@
 
 #include "mqtt_client.h"
 
+#include "math.h"
+
 /*
  * Path Loss Algorithm Summary
  * ---------------------------
@@ -38,16 +40,16 @@
  * d = 10^(intercept + slope * RSSI)
  * Used for estimating 'd' from RSSI.
  */
-const float INTERCEPT = /* Your Intercept Value */;
-const float SLOPE = /* Your Slope Value */;
+const float INTERCEPT = -2.99;
+const float SLOPE = 3.08;
 
 // Station' positions (to be replaced with actual coordinates)
-const float anchor1_x = /* x-coordinate of Anchor 1 */;
-const float anchor1_y = /* y-coordinate of Anchor 1 */;
-const float anchor2_x = /* x-coordinate of Anchor 2 */;
-const float anchor2_y = /* y-coordinate of Anchor 2 */;
-const float anchor3_x = /* x-coordinate of Anchor 3 */;
-const float anchor3_y = /* y-coordinate of Anchor 3 */;
+const int station1_x = CONFIG_STATION1_X;
+const int station1_y = CONFIG_STATION1_Y;
+const int station2_x = CONFIG_STATION2_X;
+const int station2_y = CONFIG_STATION2_Y;
+const int station3_x = CONFIG_STATION3_X;
+const int station3_y = CONFIG_STATION3_Y;
 
 /* SDK CONFIG VARIABLES */
 #define SSID CONFIG_WIFI_SSID
@@ -88,7 +90,7 @@ void wifi_scan_task(void);
 
 // Algorithm functions
 static float pathloss_calculate_dist(float rssi);
-static void trilateration_calculate_pos(float rssi[],);
+static void trilateration_calculate_pos(float rssi[], float *posX, float *posY);
 
 ///////////////////////////// Helper functions
 
@@ -103,12 +105,12 @@ static void log_error_if_nonzero(const char *message, int error_code)
 ///////////////////////////// Algorithm functions
 static float pathloss_calculate_dist(float rssi) {
     float log_distance = INTERCEPT + SLOPE * rssi;
-    printf("Calculated Distance: %f meters\n", distance);
+    printf("Calculated Distance: %f meters\n", log_distance);
     return pow(10, log_distance); // 10 raised to the power of log_distance
 }
 
 // Function to calculate the position of the target node using trilateration
-// rssi: an array of RSSI values from the three anchor nodes
+// rssi: an array of RSSI values from the three station nodes
 // posX: pointer to a float where the X-coordinate will be stored
 // posY: pointer to a float where the Y-coordinate will be stored
 static void trilateration_calculate_pos(float rssi[], float *posX, float *posY) {
@@ -119,12 +121,12 @@ static void trilateration_calculate_pos(float rssi[], float *posX, float *posY) 
 
     // Apply trilateration formulas here to compute *posX and *posY based on d1, d2, and d3
     // This is a simplification; real implementation may require iterative methods
-    float A = 2 * anchor2_x - 2 * anchor1_x;
-    float B = 2 * anchor2_y - 2 * anchor1_y;
-    float C = pow(d1, 2) - pow(d2, 2) - pow(anchor1_x, 2) + pow(anchor2_x, 2) - pow(anchor1_y, 2) + pow(anchor2_y, 2);
-    float D = 2 * anchor3_x - 2 * anchor2_x;
-    float E = 2 * anchor3_y - 2 * anchor2_y;
-    float F = pow(d2, 2) - pow(d3, 2) - pow(anchor2_x, 2) + pow(anchor3_x, 2) - pow(anchor2_y, 2) + pow(anchor3_y, 2);
+    float A = 2 * station2_x - 2 * station1_x;
+    float B = 2 * station2_y - 2 * station1_y;
+    float C = pow(d1, 2) - pow(d2, 2) - pow(station1_x, 2) + pow(station2_x, 2) - pow(station1_y, 2) + pow(station2_y, 2);
+    float D = 2 * station3_x - 2 * station2_x;
+    float E = 2 * station3_y - 2 * station2_y;
+    float F = pow(d2, 2) - pow(d3, 2) - pow(station2_x, 2) + pow(station3_x, 2) - pow(station2_y, 2) + pow(station3_y, 2);
 
     // Calculate the position of the target node (x, y)
     *posX = (C * E - F * B) / (E * A - B * D);
