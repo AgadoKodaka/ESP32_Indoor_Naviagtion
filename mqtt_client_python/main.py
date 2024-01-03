@@ -71,8 +71,8 @@ def print_positions():
 if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-i","--host", type=str, help="Host IP of broker", required=True)
-	parser.add_argument("-p","--port", type=int, help="Port", required=True)
+	parser.add_argument("-i","--host", type=str, help="Host IP of broker", default="192.168.183.128")
+	parser.add_argument("-p","--port", type=int, help="Port", default="1883")
 
 	## Useful in building the path loss model
 	parser.add_argument("-x", "--x", help="x coordinate of current beacon", type=int, default=560)

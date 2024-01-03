@@ -10,8 +10,8 @@ positions = OrderedDict()
 ## Coordinates of the Stations (APs)
 STATIONS = {
 	'Station1' : [0,0],
-	'Station2' : [480,0],
-	'Station3' : [240,480]
+	'Station2' : [600,0],
+	'Station3' : [360,600]
 }
 
 ## RSSI Model
