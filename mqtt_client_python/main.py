@@ -10,9 +10,38 @@ from util import *
 
 from scipy.optimize import minimize
 from plot import plot_heatmap
+import datetime
 
-	
-def data_listener(x,y):
+# Create folder for the beacon at the start
+current_date = datetime.date.today()
+beacon_folder_path = os.path.join('rssi_collected', const.BEACON_NAME, str(current_date))
+if not os.path.exists(beacon_folder_path):
+	os.makedirs(beacon_folder_path)
+
+def data_listener(x, y):
+	"""
+	Listens to the queue filled up by MQTT listener
+
+	Parameters:
+		x, y: Coordinates of the current beacon
+	"""
+	while True:
+		Beacon_SSID, Station_SSID, rssi = const.data_queue.get()
+
+		distance = int(dist(const.STATIONS[Station_SSID], [x, y]))
+
+		# Log the data immediately
+		
+		station_csv_path = os.path.join(beacon_folder_path, Station_SSID + '.csv')
+
+		with open(station_csv_path, 'a') as f:
+			f.write(f"{distance}, {rssi}\n")
+
+		# Printing Summary of the RSSI values received
+		print(f"Summary: {Station_SSID}-coor:{const.STATIONS[Station_SSID]} x:{x} y:{y} real_dist:{distance} {rssi}")
+
+
+def data_listener_rssi_average(x,y):
 	"""
 	Listens to the queue filled up by MQTT listener
 
@@ -43,7 +72,9 @@ def data_listener(x,y):
 			for Beacon_SSID in rssi_data[Station_SSID]:
 				rssi_data[Station_SSID][Beacon_SSID] = round((1. * sum(rssi_data[Station_SSID][Beacon_SSID])) / len(rssi_data[Station_SSID][Beacon_SSID]),1)
 				# Create paths for storing collected data
-				beacon_path = os.path.join('rssi_collected', Beacon_SSID)
+				# get current date
+				current_date = datetime.date.today()
+				beacon_path = os.path.join('rssi_collected', Beacon_SSID, current_date)
 				station_csv_path = os.path.join(beacon_path, Station_SSID + '.csv')
 				if not os.path.exists(beacon_path):
 					os.mkdir(beacon_path)
@@ -82,8 +113,8 @@ if __name__ == '__main__':
 	print("Starting paho-mqtt client to subscribe to RSSI data")
 
 	args = parser.parse_args()
-
 	print(args)
+
 
 	mqtt_thread = threading.Thread(target=connect, args=(args.host, args.port))
 	mqtt_thread.start()
