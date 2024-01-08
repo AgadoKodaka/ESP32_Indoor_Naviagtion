@@ -40,16 +40,16 @@
  * d = 10^(intercept + slope * RSSI)
  * Used for estimating 'd' from RSSI.
  */
-const float INTERCEPT = -2.99;
-const float SLOPE = 3.08;
+const float INTERCEPT = 3.386;
+const float SLOPE = -0.027;
 
 // Station' positions (to be replaced with actual coordinates)
-const int station1_x = CONFIG_STATION1_X;
-const int station1_y = CONFIG_STATION1_Y;
-const int station2_x = CONFIG_STATION2_X;
-const int station2_y = CONFIG_STATION2_Y;
-const int station3_x = CONFIG_STATION3_X;
-const int station3_y = CONFIG_STATION3_Y;
+const int station1_x = 0;
+const int station1_y = 0;
+const int station2_x = 480;
+const int station2_y = 0;
+const int station3_x = 320;
+const int station3_y = 480;
 
 /* SDK CONFIG VARIABLES */
 #define SSID CONFIG_WIFI_SSID
@@ -103,7 +103,8 @@ static void log_error_if_nonzero(const char *message, int error_code)
 }
 
 ///////////////////////////// Algorithm functions
-static float pathloss_calculate_dist(float rssi) {
+static float pathloss_calculate_dist(float rssi)
+{
     float log_distance = INTERCEPT + SLOPE * rssi;
     printf("Calculated Distance: %f meters\n", log_distance);
     return pow(10, log_distance); // 10 raised to the power of log_distance
@@ -113,7 +114,8 @@ static float pathloss_calculate_dist(float rssi) {
 // rssi: an array of RSSI values from the three station nodes
 // posX: pointer to a float where the X-coordinate will be stored
 // posY: pointer to a float where the Y-coordinate will be stored
-static void trilateration_calculate_pos(float rssi[], float *posX, float *posY) {
+static void trilateration_calculate_pos(float rssi[], float *posX, float *posY)
+{
     // Convert RSSI to distances using the path loss model
     float d1 = pathloss_calculate_dist(rssi[0]);
     float d2 = pathloss_calculate_dist(rssi[1]);
@@ -289,8 +291,20 @@ void wifi_scan_task(void)
         ESP_LOGI(TAG_SCAN, "Both WiFi and MQTT are connected. Proceeding to scan for Wifi");
         ESP_LOGI(TAG_SCAN, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_SCAN, "Free memory: %d bytes", esp_get_free_heap_size());
-        
-        float *rssi = (float *)malloc(sizeof(float) * num_ssids);
+
+        // float *rssi = (float *)malloc(sizeof(float) * num_ssids);
+        float rssi[3];
+
+        ESP_LOGI(TAG_SCAN, "num_ssids: %d", num_ssids);
+        // ESP_LOGI(TAG_SCAN, "sizeof float: %d", sizeof(float));
+        // ESP_LOGI(TAG_SCAN, "sizeof rssi pointer: %d", sizeof(rssi));
+
+        // if (rssi == NULL)
+        // {
+        //     ESP_LOGE(TAG_SCAN, "Failed to allocate memory for RSSI array.");
+        //     continue;
+        // }
+
         int num_stations_found = 0;
 
         for (size_t i = 0; i < num_ssids; i++)
@@ -299,7 +313,7 @@ void wifi_scan_task(void)
             wifi_scan_config_t scan_config = {
                 .ssid = (uint8_t *)target_ssids[i],
                 .bssid = 0,
-                .channel = 1,
+                .channel = 12,
                 .show_hidden = true};
             esp_wifi_scan_start(&scan_config, true);
             // vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
@@ -321,12 +335,11 @@ void wifi_scan_task(void)
                 {
                     esp_wifi_scan_get_ap_records(&ap_count, ap_list);
 
-                    for (int j = 0; j < ap_count; i++)
+                    for (int j = 0; j < ap_count; j++)
                     {
                         ESP_LOGI(TAG_SCAN, "SSID: %s, RSSI: %d, Channel: %d", (char *)ap_list[j].ssid, ap_list[j].rssi, ap_list[j].primary);
 
-                        rssi[i] = ap_list[j].rssi; // Store RSSI received to calculate distance later                        
-                        
+                        rssi[i] = ap_list[j].rssi; // Store RSSI received to calculate distance later
                     }
 
                     free(ap_list);
@@ -335,8 +348,6 @@ void wifi_scan_task(void)
                 {
                     ESP_LOGE(TAG_SCAN, "Failed to allocate memory for AP list.");
                 }
-
-                
             }
             // Check if disconnected before delaying for next scan
             ESP_LOGI(TAG_SCAN, "Check if disconnected before delaying for next scan");
@@ -350,7 +361,8 @@ void wifi_scan_task(void)
         }
 
         // Calculate the position of beacon if 3 stations are found
-        if (num_stations_found >= 3) {
+        if (num_stations_found >= 3)
+        {
             float posX, posY;
             trilateration_calculate_pos(rssi, &posX, &posY);
 
@@ -362,12 +374,9 @@ void wifi_scan_task(void)
             printf(mqtt_data_json);
 
             esp_mqtt_client_publish(client, MQTT_TOPIC, mqtt_data_json, 0, 1, 0);
-
-            free(rssi);
         }
-    
+        // free(rssi);
     }
-
 }
 
 void app_main(void)

@@ -11,7 +11,7 @@ positions = OrderedDict()
 STATIONS = {
 	'Station1' : [0,0],
 	'Station2' : [600,0],
-	'Station3' : [320,600]
+	'Station3' : [360,600]
 }
 
 ## RSSI Model

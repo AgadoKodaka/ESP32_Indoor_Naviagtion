@@ -133,13 +133,13 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Example Configuration
+# Wifi Configuration
 #
 CONFIG_ESP_WIFI_SSID="Station1"
 CONFIG_ESP_WIFI_PASSWORD="12345678"
 CONFIG_ESP_WIFI_CHANNEL=12
 CONFIG_ESP_MAX_STA_CONN=4
-# end of Example Configuration
+# end of Wifi Configuration
 
 #
 # Compiler options

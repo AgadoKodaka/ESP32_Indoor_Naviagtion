@@ -56,7 +56,6 @@ void wifi_scan_task(void);
 
 ///////////////////////////// Helper functions
 
-
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0)
@@ -150,7 +149,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base,
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         xEventGroupSetBits(event_group, WIFI_CONNECTED_BIT);
-        ESP_LOGI(TAG_CONNECT, "Got AP's IP: MQTT can be connected");
+        ESP_LOGI(TAG_CONNECT, "Got AP's IP: WiFi Scan can proceed");
         mqtt_app_start();
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
@@ -231,7 +230,7 @@ void wifi_scan_task(void)
             wifi_scan_config_t scan_config = {
                 .ssid = (uint8_t *)target_ssids[i],
                 .bssid = 0,
-                .channel = 1,
+                .channel = 12,
                 .show_hidden = true};
             esp_wifi_scan_start(&scan_config, true);
             // vTaskDelay(1000 / portTICK_PERIOD_MS); // Wait for the scan to complete
