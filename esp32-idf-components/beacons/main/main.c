@@ -43,19 +43,29 @@
 const float INTERCEPT = 3.386;
 const float SLOPE = -0.027;
 
-// Station' positions (to be replaced with actual coordinates)
-const int station1_x = 0;
-const int station1_y = 0;
-const int station2_x = 480;
-const int station2_y = 0;
-const int station3_x = 320;
-const int station3_y = 480;
+// #define INT_MIN -500 // Lower bound value for RSSI => already defined in esp library
+
+// Structure for station coordinates
+typedef struct {
+    int x;
+    int y;
+} Station;
+
+// Define an array of station coordinates
+const Station stations[] = {
+    {CONFIG_STATION1_X, CONFIG_STATION1_Y},
+    {CONFIG_STATION2_X, CONFIG_STATION2_Y},
+    {CONFIG_STATION3_X, CONFIG_STATION3_Y},
+    {CONFIG_STATION4_X, CONFIG_STATION4_Y}
+    // ...Add more stations here if needed
+};
 
 /* SDK CONFIG VARIABLES */
 #define SSID CONFIG_WIFI_SSID
 #define PASSWORD CONFIG_WIFI_PASSWORD
 #define WIFI_SCAN_INTERVAL CONFIG_WIFI_SCAN_INTERVAL
 #define BEACON_NAME CONFIG_BEACON_NAME
+#define NUM_STATIONS CONFIG_NUM_STATIONS
 // #define MAXIMUM_RETRY CONFIG_ESP_MAXIMUM_STA_RETRY
 
 /* The event group allows declaring status for event
@@ -111,24 +121,64 @@ static float pathloss_calculate_dist(float rssi)
 }
 
 // Function to calculate the position of the target node using trilateration
-// rssi: an array of RSSI values from the three station nodes
+// rssi: an array of RSSI values from the NUM_STATIONS stations
 // posX: pointer to a float where the X-coordinate will be stored
 // posY: pointer to a float where the Y-coordinate will be stored
-static void trilateration_calculate_pos(float rssi[], float *posX, float *posY)
+static void trilateration_calculate_pos(float rssi[NUM_STATIONS], float *posX, float *posY)
 {
-    // Convert RSSI to distances using the path loss model
-    float d1 = pathloss_calculate_dist(rssi[0]);
-    float d2 = pathloss_calculate_dist(rssi[1]);
-    float d3 = pathloss_calculate_dist(rssi[2]);
+    float d1, d2, d3;
+    Station s1, s2, s3;
+    if (NUM_STATIONS > 3) {
+        // Find 3 highest RSSI values
+        float highest = INT_MIN, second_highest = INT_MIN, third_highest = INT_MIN;
+        int idx_highest = 0, idx_second_highest = 0, idx_third_highest = 0;
+
+        for (int i = 0; i < NUM_STATIONS; i++) {
+            if (rssi[i] > highest) {
+                third_highest = second_highest;
+                idx_third_highest = idx_second_highest;
+                second_highest = highest;
+                idx_second_highest = idx_highest;
+                highest = rssi[i];
+                idx_highest = i;
+            } else if (rssi[i] > second_highest) {
+                third_highest = second_highest;
+                idx_third_highest = idx_second_highest;
+                second_highest = rssi[i];
+                idx_second_highest = i;
+            } else if (rssi[i] > third_highest) {
+                third_highest = rssi[i];
+                idx_third_highest = i;
+            }
+        }
+        // Convert RSSI to distances using the path loss model
+        d1 = pathloss_calculate_dist(rssi[idx_highest]);
+        d2 = pathloss_calculate_dist(rssi[idx_second_highest]);
+        d3 = pathloss_calculate_dist(rssi[idx_third_highest]);
+        // Get coordinates of the three highest RSSI stations
+        s1 = stations[idx_highest];
+        s2 = stations[idx_second_highest];
+        s3 = stations[idx_third_highest];
+    } else {
+        // Convert RSSI to distances using the path loss model
+        d1 = pathloss_calculate_dist(rssi[0]);
+        d2 = pathloss_calculate_dist(rssi[1]);
+        d3 = pathloss_calculate_dist(rssi[2]);
+        // Get coordinates of the three stations
+        s1 = stations[0];
+        s2 = stations[1];
+        s3 = stations[2];
+    }
+
 
     // Apply trilateration formulas here to compute *posX and *posY based on d1, d2, and d3
     // This is a simplification; real implementation may require iterative methods
-    float A = 2 * station2_x - 2 * station1_x;
-    float B = 2 * station2_y - 2 * station1_y;
-    float C = pow(d1, 2) - pow(d2, 2) - pow(station1_x, 2) + pow(station2_x, 2) - pow(station1_y, 2) + pow(station2_y, 2);
-    float D = 2 * station3_x - 2 * station2_x;
-    float E = 2 * station3_y - 2 * station2_y;
-    float F = pow(d2, 2) - pow(d3, 2) - pow(station2_x, 2) + pow(station3_x, 2) - pow(station2_y, 2) + pow(station3_y, 2);
+    float A = 2 * s2.x - 2 * s1.x;
+    float B = 2 * s2.y - 2 * s1.y;
+    float C = pow(d1, 2) - pow(d2, 2) - pow(s1.x, 2) + pow(s2.x, 2) - pow(s1.y, 2) + pow(s2.y, 2);
+    float D = 2 * s3.x - 2 * s2.x;
+    float E = 2 * s3.y - 2 * s2.y;
+    float F = pow(d2, 2) - pow(d3, 2) - pow(s2.x, 2) + pow(s3.x, 2) - pow(s2.y, 2) + pow(s3.y, 2);
 
     // Calculate the position of the target node (x, y)
     *posX = (C * E - F * B) / (E * A - B * D);
@@ -292,18 +342,9 @@ void wifi_scan_task(void)
         ESP_LOGI(TAG_SCAN, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_SCAN, "Free memory: %d bytes", esp_get_free_heap_size());
 
-        // float *rssi = (float *)malloc(sizeof(float) * num_ssids);
-        float rssi[3];
+        float rssi[NUM_STATIONS] = {0.0};
 
         ESP_LOGI(TAG_SCAN, "num_ssids: %d", num_ssids);
-        // ESP_LOGI(TAG_SCAN, "sizeof float: %d", sizeof(float));
-        // ESP_LOGI(TAG_SCAN, "sizeof rssi pointer: %d", sizeof(rssi));
-
-        // if (rssi == NULL)
-        // {
-        //     ESP_LOGE(TAG_SCAN, "Failed to allocate memory for RSSI array.");
-        //     continue;
-        // }
 
         int num_stations_found = 0;
 

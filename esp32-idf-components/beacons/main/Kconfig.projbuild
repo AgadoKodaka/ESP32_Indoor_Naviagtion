@@ -34,6 +34,12 @@ menu "Beacon Config"
 endmenu
 
 menu "Station Config"
+    config NUM_STATIONS
+        int "Number of stations"
+        range 0 4
+        default 3
+        help
+            Number of stations to be tracked
     config STATION1_X
         int "x-coordinate of station 1"
         default 0
@@ -52,4 +58,10 @@ menu "Station Config"
     config STATION3_Y
         int "y-coordinate of station 3"
         default 0    
+    config STATION4_X
+        int "x-coordinate of station 4"
+        default 0
+    config STATION4_Y
+        int "y-coordinate of station 4"
+        default 0
 endmenu
