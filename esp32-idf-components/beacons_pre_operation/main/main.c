@@ -41,7 +41,7 @@ char *rssi_data_json = NULL;
 esp_mqtt_client_handle_t client;
 
 /*Targeted SSIDs*/
-const char *target_ssids[] = {"Station1", "Station2", "Station3"};
+const char *target_ssids[] = {"Station1", "Station2", "Station3", "Station4"};
 const size_t num_ssids = sizeof(target_ssids) / sizeof(target_ssids[0]);
 
 ///////////////////////////// Function declaration
@@ -55,7 +55,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base,
 void wifi_scan_task(void);
 
 ///////////////////////////// Helper functions
-
 
 static void log_error_if_nonzero(const char *message, int error_code)
 {

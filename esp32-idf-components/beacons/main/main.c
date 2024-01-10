@@ -46,7 +46,8 @@ const float SLOPE = -0.027;
 // #define INT_MIN -500 // Lower bound value for RSSI => already defined in esp library
 
 // Structure for station coordinates
-typedef struct {
+typedef struct
+{
     int x;
     int y;
 } Station;
@@ -76,7 +77,7 @@ const int MQTT_CONNECTED_BIT = BIT1;
 
 static const char *TAG_CONNECT = "WiFi Connect";
 static const char *TAG_SCAN = "WiFi Scan";
-// static const char *TAG_LOCALIZE = "LOCALIZATION";
+static const char *TAG_LOCALIZE = "LOCALIZATION";
 static const char *TAG_MQTT = "MQTT";
 
 char *MQTT_TOPIC = NULL;
@@ -85,7 +86,7 @@ char *mqtt_data_json = NULL;
 esp_mqtt_client_handle_t client;
 
 /*Targeted SSIDs*/
-const char *target_ssids[] = {"Station1", "Station2", "Station3"};
+const char *target_ssids[] = {"Station1", "Station2", "Station3", "Station4"};
 const size_t num_ssids = sizeof(target_ssids) / sizeof(target_ssids[0]);
 
 ///////////////////////////// Function declaration
@@ -116,8 +117,9 @@ static void log_error_if_nonzero(const char *message, int error_code)
 static float pathloss_calculate_dist(float rssi)
 {
     float log_distance = INTERCEPT + SLOPE * rssi;
-    printf("Calculated Distance: %f cm\n", log_distance);
-    return pow(10, log_distance); // 10 raised to the power of log_distance
+    float distance = pow(10, log_distance);
+    printf("Calculated Distance: %f cm\n", distance);
+    return distance; // 10 raised to the power of log_distance
 }
 
 // Function to calculate the position of the target node using trilateration
@@ -128,25 +130,32 @@ static void trilateration_calculate_pos(float rssi[NUM_STATIONS], float *posX, f
 {
     float d1, d2, d3;
     Station s1, s2, s3;
-    if (NUM_STATIONS > 3) {
+    if (NUM_STATIONS > 3)
+    {
         // Find 3 highest RSSI values
         float highest = INT_MIN, second_highest = INT_MIN, third_highest = INT_MIN;
         int idx_highest = 0, idx_second_highest = 0, idx_third_highest = 0;
 
-        for (int i = 0; i < NUM_STATIONS; i++) {
-            if (rssi[i] > highest) {
+        for (int i = 0; i < NUM_STATIONS; i++)
+        {
+            if (rssi[i] > highest)
+            {
                 third_highest = second_highest;
                 idx_third_highest = idx_second_highest;
                 second_highest = highest;
                 idx_second_highest = idx_highest;
                 highest = rssi[i];
                 idx_highest = i;
-            } else if (rssi[i] > second_highest) {
+            }
+            else if (rssi[i] > second_highest)
+            {
                 third_highest = second_highest;
                 idx_third_highest = idx_second_highest;
                 second_highest = rssi[i];
                 idx_second_highest = i;
-            } else if (rssi[i] > third_highest) {
+            }
+            else if (rssi[i] > third_highest)
+            {
                 third_highest = rssi[i];
                 idx_third_highest = i;
             }
@@ -159,7 +168,9 @@ static void trilateration_calculate_pos(float rssi[NUM_STATIONS], float *posX, f
         s1 = stations[idx_highest];
         s2 = stations[idx_second_highest];
         s3 = stations[idx_third_highest];
-    } else {
+    }
+    else
+    {
         // Convert RSSI to distances using the path loss model
         d1 = pathloss_calculate_dist(rssi[0]);
         d2 = pathloss_calculate_dist(rssi[1]);
@@ -170,6 +181,8 @@ static void trilateration_calculate_pos(float rssi[NUM_STATIONS], float *posX, f
         s3 = stations[2];
     }
 
+    ESP_LOGI(TAG_LOCALIZE, "s1: (%d, %d), s2: (%d, %d), s3: (%d, %d)", s1.x, s1.y, s2.x, s2.y, s3.x, s3.y);
+    ESP_LOGI(TAG_LOCALIZE, "d1: %f, d2: %f, d3: %f", d1, d2, d3);
 
     // Apply trilateration formulas here to compute *posX and *posY based on d1, d2, and d3
     // This is a simplification; real implementation may require iterative methods
@@ -404,6 +417,7 @@ void wifi_scan_task(void)
         // Calculate the position of beacon if 3 stations are found
         if (num_stations_found >= 3)
         {
+            ESP_LOGI(TAG_LOCALIZE, "Found more than 3 beacons! Calculating position of beacon...");
             float posX, posY;
             trilateration_calculate_pos(rssi, &posX, &posY);
 
