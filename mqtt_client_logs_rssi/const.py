@@ -12,8 +12,7 @@ STATIONS = {
 	'Station1' : [0,280],
 	'Station2' : [280,600],
 	'Station3' : [600,280],
-    'Station4' : [280, 0]
-
+    'Station4': [280, 0]
 }
 
 ## RSSI Model

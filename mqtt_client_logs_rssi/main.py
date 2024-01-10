@@ -28,6 +28,8 @@ def data_listener(x, y):
 	while True:
 		Beacon_SSID, Station_SSID, rssi = const.data_queue.get()
 
+		# print(f"Beacon: {Beacon_SSID} - Station: {Station_SSID} - RSSI: {rssi}")
+
 		distance = int(dist(const.STATIONS[Station_SSID], [x, y]))
 
 		# Log the data immediately
@@ -102,7 +104,7 @@ def print_positions():
 if __name__ == '__main__':
 	
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-i","--host", type=str, help="Host IP of broker", default="192.168.183.128")
+	parser.add_argument("-i","--host", type=str, help="Host IP of broker", default="192.168.183.63")
 	parser.add_argument("-p","--port", type=int, help="Port", default="1883")
 
 	## Useful in building the path loss model

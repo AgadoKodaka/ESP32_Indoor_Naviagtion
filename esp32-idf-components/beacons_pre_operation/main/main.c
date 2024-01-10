@@ -56,7 +56,6 @@ void wifi_scan_task(void);
 
 ///////////////////////////// Helper functions
 
-
 static void log_error_if_nonzero(const char *message, int error_code)
 {
     if (error_code != 0)
