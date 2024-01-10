@@ -106,7 +106,7 @@ static void log_error_if_nonzero(const char *message, int error_code)
 static float pathloss_calculate_dist(float rssi)
 {
     float log_distance = INTERCEPT + SLOPE * rssi;
-    printf("Calculated Distance: %f meters\n", log_distance);
+    printf("Calculated Distance: %f cm\n", log_distance);
     return pow(10, log_distance); // 10 raised to the power of log_distance
 }
 
@@ -398,7 +398,6 @@ void app_main(void)
 
     // Allow other core to finish initialization
     vTaskDelay(pdMS_TO_TICKS(200));
-
     // Initialize nvs partition
     ESP_LOGI(__func__, "Initialize nvs partition.");
     initialize_nvs();
