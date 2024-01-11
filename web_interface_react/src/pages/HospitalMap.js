@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import mqtt from "precompiled-mqtt";
-import mapImage from "../images/RoomMap.png"; // Ensure this is the path to your map image file
+import mapImage from "../images/HospitalMap.png"; // Ensure this is the path to your map image file
 
-import "./MapPage.css";
+import "../styles/MapPage.css";
 
-const MapPage = () => {
+const HospitalMap = () => {
   const [deviceIdInput, setDeviceIdInput] = useState(""); // This is the input value for the device ID form
   const [deviceId, setDeviceId] = useState("");
   const [currentLocation, setCurrentLocation] = useState([ 100, 260 ]);
@@ -103,7 +103,7 @@ const MapPage = () => {
   useEffect(() => {
     if (deviceId) {
       // Only connect to MQTT if deviceId is set
-      mqttClientRef.current = mqtt.connect("mqtt://test.mosquitto.org:8081"); // Use your MQTT broker URL
+      mqttClientRef.current = mqtt.connect("ws://192.168.183.128:8080"); // Use your MQTT broker URL
 
       mqttClientRef.current.on("connect", () => {
         console.log(`Connected to MQTT broker as device ${deviceId}`);
@@ -116,7 +116,9 @@ const MapPage = () => {
 
       mqttClientRef.current.on("message", (topic, message) => {
         // Parse message and update current location state
+        console.log(`Received message on topic ${topic}`);
         const location = JSON.parse(message.toString());
+        console.log(location);
         let convertedLocation = [location.posX, location.posY]
         setCurrentLocation(convertedLocation);
       });
@@ -394,4 +396,4 @@ const MapPage = () => {
   );
 };
 
-export default MapPage;
+export default HospitalMap;

@@ -1,11 +1,12 @@
 import React from 'react';
-import MapPage from './pages/MapPage';
+import HospitalMap from './pages/HospitalMap';
+import SupermarketMap from './pages/SupermarketMap';
 
 function App() {
   return (
     <div className="App">
-      {/* <h1>Oiko mai thi roi!</h1> */}
-      <MapPage />
+      <SupermarketMap />
+      {/* <HospitalMap /> */}
     </div>
   );
 }
