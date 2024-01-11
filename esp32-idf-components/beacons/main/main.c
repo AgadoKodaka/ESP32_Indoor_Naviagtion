@@ -42,6 +42,8 @@
  */
 const float INTERCEPT = 3.386;
 const float SLOPE = -0.027;
+const float MAX_RSSI = -60; // Upper bound value for RSSI
+const float MIN_RSSI = -80; // Lower bound value for RSSI
 
 // #define INT_MIN -500 // Lower bound value for RSSI => already defined in esp library
 
@@ -355,7 +357,7 @@ void wifi_scan_task(void)
         ESP_LOGI(TAG_SCAN, "Scanning for WiFi networks...");
         ESP_LOGI(TAG_SCAN, "Free memory: %d bytes", esp_get_free_heap_size());
 
-        float rssi[NUM_STATIONS] = {0.0};
+        float rssi[NUM_STATIONS] = {INT_MIN};
 
         ESP_LOGI(TAG_SCAN, "num_ssids: %d", num_ssids);
 
@@ -397,6 +399,18 @@ void wifi_scan_task(void)
                     }
 
                     free(ap_list);
+
+                    // Check if RSSI value is within range
+                    if (rssi[i] > MAX_RSSI || rssi[i] < MIN_RSSI)
+                    {
+                        ESP_LOGI(TAG_SCAN, "RSSI value out of range. Discarding...");
+                        rssi[i] = INT_MIN;
+                        num_stations_found--;
+                    }
+                    else
+                    {
+                        ESP_LOGI(TAG_SCAN, "RSSI value in range. Proceeding to calculate distance...");
+                    }
                 }
                 else
                 {
