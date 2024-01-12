@@ -40,8 +40,8 @@
  * d = 10^(intercept + slope * RSSI)
  * Used for estimating 'd' from RSSI.
  */
-const float INTERCEPT = 3.386;
-const float SLOPE = -0.027;
+const float A = -23.958;
+const float n = 1.848;
 
 // #define INT_MIN -500 // Lower bound value for RSSI => already defined in esp library
 
@@ -116,7 +116,7 @@ static void log_error_if_nonzero(const char *message, int error_code)
 ///////////////////////////// Algorithm functions
 static float pathloss_calculate_dist(float rssi)
 {
-    float log_distance = INTERCEPT + SLOPE * rssi;
+    float log_distance = (A - rssi) / (10 * n);
     float distance = pow(10, log_distance);
     printf("Calculated Distance: %f cm\n", distance);
     return distance; // 10 raised to the power of log_distance
