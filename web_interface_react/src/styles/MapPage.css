@@ -1,0 +1,11 @@
+
+/* Add this CSS to your main CSS file or within a <style> tag in your HTML/JSX */
+
+.container {
+  display: flex;
+  justify-content: center; /* Center children horizontally */
+  align-items: center; /* Center children vertically */
+  min-height: 100vh; /* At least the height of the viewport */
+  flex-direction: column; /* Stack children vertically */
+  text-align: center; /* Ensure inline content is centered as well */
+}
