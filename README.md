@@ -52,23 +52,21 @@ where Pr is the received power, P0 is the received power at a reference distance
 
 **Modified Model**: We modify the One-Slope Model to simplifies the measurement process by using RSSI directly, which is a common practical measure in wireless networks:
 
-$$ RSSI = A + B*log(d) $$
-
-where RSSI is the value received, d is the predetermined distance from the beacon to the AP (Access Point), and A and B are constants to be determined.
+$$ RSSI = A - 10n*log(d) $$
 
 ### Use Linear Regression (ML algorithm) to estimate constants of the model
 
-In a practical machine learning setting, we usually predict the target variable directly from the input features. To make distance the target variable, we need to rearrange the model as:
+We want to train a linear regression model, with given training data of (distance, RSSI) pairs. The trained model  can estimate paramters A and n.
 
-$$ d = 10^{\frac{RSSI-A}{B}} $$
+Our model is actually fitting:
 
-Since machine learning models generally perform better with linear relationships, we'll transform the target variable (distance) into a linear form:
+$$ RSSI = intercept + slope*log(d) $$
 
-$$ log(d) = \frac{RSSI-A}{B}  $$
+Therefore, A and n can be found as:
 
-the model is actually fitting:
+$$ n = -\frac{slope}{10} $$
 
-$$ log(d) = intercept + slope*RSSI $$
+$$ A = intercept $$  
 
 ### Caculate parameters for Path Loss model
 
